@@ -1,0 +1,43 @@
+app = 'gs-webhook-2-events'
+primary_region = 'cdg'
+
+[build]
+
+[deploy]
+  release_command = 'npx prisma migrate deploy'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3000'
+  HOST = '0.0.0.0'
+  RETRY_JOB_INTERVAL_MS = '60000'
+  RETRY_JOB_MAX_RETRIES = '10'
+  GS_STREAM_API_URL = 'https://gs-stream-api.fly.dev'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [http_service.concurrency]
+    type = 'requests'
+    hard_limit = 250
+    soft_limit = 200
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 2
+
+[checks]
+  [checks.health]
+    grace_period = '30s'
+    interval = '15s'
+    method = 'GET'
+    path = '/health'
+    port = 3000
+    timeout = '10s'
+    type = 'http'

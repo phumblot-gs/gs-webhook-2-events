@@ -1,0 +1,837 @@
+openapi: 3.1.0
+info:
+  title: gs-webhook-2-events
+  version: 1.0.0
+  description: |
+    Webhook receiver for Grand Shooting events, publishing to gs-stream-api.
+
+    This service receives webhooks from Grand Shooting when pictures or references are created, updated, or deleted.
+    Events are then published to the gs-stream-api for further processing by other services.
+
+    ## Authentication
+
+    ### Webhook Endpoint
+    The webhook endpoint requires a secret key passed as a query parameter (`key`).
+
+    ### Admin API
+    The admin API requires an API key passed in the `x-api-key` header.
+
+    ## Event Types
+    The following event types are supported:
+    - `pictures/create` - Picture created
+    - `pictures/update` - Picture updated
+    - `pictures/delete` - Picture deleted
+    - `references/create` - Reference created
+    - `references/update` - Reference updated
+    - `references/delete` - Reference deleted
+
+  contact:
+    name: Grand Shooting
+    url: https://grand-shooting.com
+    email: help@grand-shooting.com
+  license:
+    name: Private
+    identifier: LicenseRef-Proprietary
+
+servers:
+  - url: https://gs-webhook-2-events.grand-shooting.com
+    description: Production
+  - url: https://gs-webhook-2-events-staging.grand-shooting.com
+    description: Staging
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Webhook
+    description: Webhook receiver endpoints for Grand Shooting events
+  - name: Admin - Clients
+    description: Client management endpoints
+  - name: Admin - Webhooks
+    description: Webhook configuration endpoints
+  - name: Admin - Failed Events
+    description: Failed events management and replay endpoints
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      name: x-api-key
+      in: header
+      description: Admin API key for accessing administration endpoints
+
+  schemas:
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier
+        accountId:
+          type: integer
+          description: Grand Shooting account ID
+        accountName:
+          type: string
+          description: Client name
+        enabled:
+          type: boolean
+          description: Whether the client is enabled
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        webhookConfigs:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebhookConfig'
+
+    WebhookConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+          enum:
+            - pictures/create
+            - pictures/update
+            - pictures/delete
+            - references/create
+            - references/update
+            - references/delete
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FailedEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        accountId:
+          type: integer
+        eventType:
+          type: string
+        payload:
+          type: object
+        error:
+          type: string
+        retryCount:
+          type: integer
+        nextRetry:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        client:
+          type:
+            - object
+            - 'null'
+          properties:
+            accountName:
+              type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    WebhookPayload:
+      type: object
+      required:
+        - account_id
+        - topic
+        - type
+        - ids
+      properties:
+        account_id:
+          type: integer
+          description: Grand Shooting account ID
+        topic:
+          type: string
+          description: Event topic (e.g., pictures/create)
+        type:
+          type: string
+          enum: [picture, reference]
+          description: Resource type
+        ids:
+          type: array
+          items:
+            oneOf:
+              - type: integer
+              - type: string
+          description: List of affected resource IDs
+        data:
+          type: object
+          additionalProperties: true
+          description: Resource data keyed by ID
+        picture_id:
+          type: array
+          items:
+            type: integer
+          description: Deprecated - use ids instead
+          deprecated: true
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check the health status of the service and database connection
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  name:
+                    type: string
+                    example: gs-webhook-2-events
+                  version:
+                    type: string
+                    example: 1.0.0
+                  timestamp:
+                    type: string
+                    format: date-time
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  error:
+                    type: string
+
+  /ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness check
+      description: Check if the service is ready to receive traffic
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+
+  /webhook/{accountId}:
+    post:
+      tags:
+        - Webhook
+      summary: Receive webhook events
+      description: |
+        Receive webhook events from Grand Shooting.
+
+        This endpoint is called by Grand Shooting when pictures or references are created, updated, or deleted.
+        The service validates the payload, checks if the event type is enabled for the client, and publishes
+        the event to gs-stream-api.
+      operationId: receiveWebhook
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Grand Shooting account ID
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Secret key for authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+            example:
+              account_id: 12345
+              topic: pictures/create
+              type: picture
+              ids: [1, 2, 3]
+              data:
+                '1':
+                  name: photo1.jpg
+                '2':
+                  name: photo2.jpg
+                '3':
+                  name: photo3.jpg
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  processed:
+                    type: integer
+                    description: Number of events processed
+                  failed:
+                    type: integer
+                    description: Number of events that failed
+        '400':
+          description: Invalid payload or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid secret key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/clients:
+    get:
+      tags:
+        - Admin - Clients
+      summary: List clients
+      description: Get a paginated list of all clients
+      operationId: listClients
+      security:
+        - apiKey: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Client'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - Admin - Clients
+      summary: Create client
+      description: |
+        Create a new client.
+
+        When a client is created, webhook configurations for all event types are automatically created
+        with enabled=true.
+      operationId: createClient
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - accountId
+                - accountName
+              properties:
+                accountId:
+                  type: integer
+                  description: Grand Shooting account ID
+                accountName:
+                  type: string
+                  description: Client name
+                enabled:
+                  type: boolean
+                  default: true
+            example:
+              accountId: 12345
+              accountName: Acme Corp
+              enabled: true
+      responses:
+        '201':
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Client with this account ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/clients/{id}:
+    get:
+      tags:
+        - Admin - Clients
+      summary: Get client
+      description: Get a client by ID
+      operationId: getClient
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Client details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Admin - Clients
+      summary: Update client
+      description: Update a client's name or enabled status
+      operationId: updateClient
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accountName:
+                  type: string
+                enabled:
+                  type: boolean
+            example:
+              accountName: Updated Name
+              enabled: false
+      responses:
+        '200':
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - Admin - Clients
+      summary: Delete client
+      description: Delete a client and all associated webhook configurations
+      operationId: deleteClient
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Client deleted
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/clients/{id}/webhooks:
+    get:
+      tags:
+        - Admin - Webhooks
+      summary: Get webhook configurations
+      description: Get all webhook configurations for a client
+      operationId: getWebhookConfigs
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Webhook configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WebhookConfig'
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Admin - Webhooks
+      summary: Update webhook configurations
+      description: Update webhook configurations for a client (enable/disable specific event types)
+      operationId: updateWebhookConfigs
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - configs
+              properties:
+                configs:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - eventType
+                      - enabled
+                    properties:
+                      eventType:
+                        type: string
+                        enum:
+                          - pictures/create
+                          - pictures/update
+                          - pictures/delete
+                          - references/create
+                          - references/update
+                          - references/delete
+                      enabled:
+                        type: boolean
+            example:
+              configs:
+                - eventType: pictures/create
+                  enabled: true
+                - eventType: pictures/delete
+                  enabled: false
+      responses:
+        '200':
+          description: Webhook configurations updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WebhookConfig'
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/failed-events:
+    get:
+      tags:
+        - Admin - Failed Events
+      summary: List failed events
+      description: Get a paginated list of failed events with optional filtering
+      operationId: listFailedEvents
+      security:
+        - apiKey: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: accountId
+          in: query
+          schema:
+            type: integer
+          description: Filter by account ID
+        - name: eventType
+          in: query
+          schema:
+            type: string
+            enum:
+              - pictures/create
+              - pictures/update
+              - pictures/delete
+              - references/create
+              - references/update
+              - references/delete
+          description: Filter by event type
+      responses:
+        '200':
+          description: List of failed events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FailedEvent'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/failed-events/stats:
+    get:
+      tags:
+        - Admin - Failed Events
+      summary: Get failed events statistics
+      description: Get statistics about failed events
+      operationId: getFailedEventsStats
+      security:
+        - apiKey: []
+      responses:
+        '200':
+          description: Failed events statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    description: Total number of failed events
+                  pending:
+                    type: integer
+                    description: Number of events pending retry
+                  maxRetries:
+                    type: integer
+                    description: Number of events that reached max retries
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/failed-events/replay:
+    post:
+      tags:
+        - Admin - Failed Events
+      summary: Replay failed events
+      description: |
+        Manually trigger replay of failed events.
+
+        You can either:
+        - Specify specific event IDs to replay
+        - Set `all: true` to replay all events that haven't reached max retries
+      operationId: replayFailedEvents
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Specific event IDs to replay
+                all:
+                  type: boolean
+                  description: Replay all pending events
+            examples:
+              byIds:
+                summary: Replay specific events
+                value:
+                  ids:
+                    - 550e8400-e29b-41d4-a716-446655440000
+              all:
+                summary: Replay all pending events
+                value:
+                  all: true
+      responses:
+        '200':
+          description: Replay results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  replayed:
+                    type: integer
+                    description: Number of events successfully replayed
+                  failed:
+                    type: integer
+                    description: Number of events that failed to replay
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/failed-events/{id}:
+    delete:
+      tags:
+        - Admin - Failed Events
+      summary: Delete failed event
+      description: Delete a failed event (remove from retry queue)
+      operationId: deleteFailedEvent
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Event deleted
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

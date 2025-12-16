@@ -1,0 +1,53 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run tests
+        run: npm test
+        env:
+          DATABASE_URL: postgresql://localhost:5432/test
+          WEBHOOK_SECRET_KEY: test-webhook-secret-key
+          ADMIN_API_KEY: test-admin-api-key-123
+          GS_STREAM_API_URL: https://test.example.com
+          GS_STREAM_API_TOKEN: test-token
+
+  deploy:
+    name: Deploy to Fly.io Staging
+    runs-on: ubuntu-latest
+    needs: test
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Staging
+        run: flyctl deploy --config fly.staging.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

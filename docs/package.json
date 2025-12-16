@@ -1,0 +1,13 @@
+{
+  "name": "gs-webhook-2-events-docs",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "redocly preview-docs openapi.yaml",
+    "build": "redocly build-docs openapi.yaml -o index.html",
+    "lint": "redocly lint openapi.yaml"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^1.25.13"
+  }
+}

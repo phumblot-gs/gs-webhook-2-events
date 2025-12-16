@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  accountId   Int      @unique @map("account_id")
+  accountName String   @map("account_name")
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  webhookConfigs WebhookConfig[]
+  failedEvents   FailedEvent[]
+
+  @@map("clients")
+}
+
+model WebhookConfig {
+  id        String   @id @default(uuid())
+  clientId  String   @map("client_id")
+  eventType String   @map("event_type")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, eventType])
+  @@map("webhook_configs")
+}
+
+model FailedEvent {
+  id         String   @id @default(uuid())
+  clientId   String?  @map("client_id")
+  accountId  Int      @map("account_id")
+  eventType  String   @map("event_type")
+  payload    Json
+  error      String
+  retryCount Int      @default(0) @map("retry_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  nextRetry  DateTime? @map("next_retry")
+
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([nextRetry])
+  @@index([accountId])
+  @@map("failed_events")
+}

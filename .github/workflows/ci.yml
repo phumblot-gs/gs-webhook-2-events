@@ -1,10 +1,10 @@
-name: CI
+name: CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging, production]
   pull_request:
-    branches: [main]
+    branches: [main, staging, production]
 
 jobs:
   test:
@@ -37,7 +37,6 @@ jobs:
         run: npm test
         env:
           DATABASE_URL: postgresql://localhost:5432/test
-          WEBHOOK_SECRET_KEY: test-webhook-secret-key
           ADMIN_API_KEY: test-admin-api-key-123
           GS_STREAM_API_URL: https://test.example.com
           GS_STREAM_API_TOKEN: test-token
@@ -67,3 +66,49 @@ jobs:
       - name: Lint OpenAPI spec
         working-directory: docs
         run: npm run lint
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test, docs-lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Staging
+        run: flyctl deploy --remote-only --app gs-webhook-2-events-staging
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Run database migrations
+        run: flyctl ssh console --app gs-webhook-2-events-staging -C "npx prisma migrate deploy"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test, docs-lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/production'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Production
+        run: flyctl deploy --remote-only --app gs-webhook-2-events
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Run database migrations
+        run: flyctl ssh console --app gs-webhook-2-events -C "npx prisma migrate deploy"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

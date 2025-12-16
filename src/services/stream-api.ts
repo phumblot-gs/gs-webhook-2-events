@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { env } from '../config/env.js'
 import { APP_NAME, APP_VERSION } from '../config/constants.js'
 import { logger } from '../lib/logger.js'
+import { intToUuidV8 } from '../lib/uuid.js'
 import type { StreamEventInput } from '../schemas/events.js'
 
 interface PublishResult {
@@ -23,8 +24,8 @@ export class StreamApiClient {
     const eventId = uuidv4()
     const timestamp = new Date().toISOString()
 
-    // Format accountId as UUID-like string for gs-stream-api compatibility
-    const accountIdUuid = `00000000-0000-0000-0000-${String(input.accountId).padStart(12, '0')}`
+    // Convert accountId to valid UUID v8 format for gs-stream-api compatibility
+    const accountIdUuid = intToUuidV8(input.accountId)
 
     const event = {
       eventId,

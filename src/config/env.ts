@@ -14,6 +14,13 @@ const envSchema = z.object({
 
   RETRY_JOB_INTERVAL_MS: z.coerce.number().default(60000),
   RETRY_JOB_MAX_RETRIES: z.coerce.number().default(10),
+
+  // Axiom (optional)
+  AXIOM_TOKEN: z.string().optional(),
+  AXIOM_DATASET: z.string().default('gs-webhook-2-events'),
+
+  // Sentry (optional)
+  SENTRY_DSN: z.string().url().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>

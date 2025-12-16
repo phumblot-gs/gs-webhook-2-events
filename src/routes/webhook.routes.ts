@@ -4,7 +4,7 @@ import { webhookService } from '../services/webhook.service.js'
 import { clientService } from '../services/client.service.js'
 import { webhookPayloadSchema, webhookQuerySchema, webhookParamsSchema } from '../schemas/webhook.js'
 
-export async function webhookRoutes(fastify: FastifyInstance) {
+export function webhookRoutes(fastify: FastifyInstance) {
   fastify.post<{
     Params: { accountId: string }
     Querystring: { key: string }

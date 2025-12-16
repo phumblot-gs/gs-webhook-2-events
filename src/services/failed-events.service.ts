@@ -131,16 +131,15 @@ export class FailedEventsService {
       originalTopic: string
     }
 
-    const natsEventType = EVENT_TYPE_TO_NATS[event.eventType as EventType]
-    if (!natsEventType) {
+    const eventTypeKey = event.eventType as EventType
+    if (!(eventTypeKey in EVENT_TYPE_TO_NATS)) {
       logger.error({ eventType: event.eventType }, 'Unknown event type for replay')
       await prisma.failedEvent.delete({ where: { id: event.id } })
       return false
     }
+    const natsEventType = EVENT_TYPE_TO_NATS[eventTypeKey]
 
-    const itemData = typeof payload.itemData === 'object' && payload.itemData !== null
-      ? payload.itemData
-      : {}
+    const itemData = payload.itemData
 
     const result = await streamApiClient.publishEvent({
       accountId: event.accountId,

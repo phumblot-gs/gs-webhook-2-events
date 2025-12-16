@@ -66,7 +66,7 @@ export class WebhookService {
         processed++
       } else {
         failed++
-        errors.push(`Failed to publish event for ${resourceType} ${resourceId}: ${result.error}`)
+        errors.push(`Failed to publish event for ${resourceType} ${resourceId}: ${result.error ?? 'Unknown error'}`)
 
         await this.saveFailedEvent(accountId, eventType, {
           resourceId,
@@ -105,8 +105,8 @@ export class WebhookService {
     try {
       const client = await clientService.findByAccountId(accountId)
 
-      const itemDataJson = typeof data.itemData === 'object' && data.itemData !== null
-        ? JSON.parse(JSON.stringify(data.itemData))
+      const itemDataJson: Record<string, unknown> = typeof data.itemData === 'object' && data.itemData !== null
+        ? (JSON.parse(JSON.stringify(data.itemData)) as Record<string, unknown>)
         : {}
 
       await prisma.failedEvent.create({

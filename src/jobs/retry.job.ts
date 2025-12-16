@@ -15,18 +15,20 @@ export function startRetryJob() {
     'Starting retry job'
   )
 
-  intervalId = setInterval(async () => {
-    try {
-      const result = await failedEventsService.replayPendingEvents()
-      if (result.replayed > 0 || result.failed > 0) {
-        logger.info(result, 'Retry job completed')
+  intervalId = setInterval(() => {
+    void (async () => {
+      try {
+        const result = await failedEventsService.replayPendingEvents()
+        if (result.replayed > 0 || result.failed > 0) {
+          logger.info(result, 'Retry job completed')
+        }
+      } catch (error) {
+        logger.error({ error }, 'Retry job failed')
       }
-    } catch (error) {
-      logger.error({ error }, 'Retry job failed')
-    }
+    })()
   }, env.RETRY_JOB_INTERVAL_MS)
 
-  runImmediately()
+  void runImmediately()
 }
 
 export function stopRetryJob() {

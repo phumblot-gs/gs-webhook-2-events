@@ -19,8 +19,8 @@ async function main() {
     process.exit(0)
   }
 
-  process.on('SIGTERM', () => shutdown('SIGTERM'))
-  process.on('SIGINT', () => shutdown('SIGINT'))
+  process.on('SIGTERM', () => void shutdown('SIGTERM'))
+  process.on('SIGINT', () => void shutdown('SIGINT'))
 
   try {
     await prisma.$connect()
@@ -37,7 +37,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+main().catch((error: unknown) => {
   logger.error({ error }, 'Unhandled error in main')
   process.exit(1)
 })

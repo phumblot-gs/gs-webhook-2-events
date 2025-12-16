@@ -6,6 +6,7 @@ import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import { env } from './config/env.js'
 import { logger } from './lib/logger.js'
+import { Sentry } from './lib/sentry.js'
 import { webhookRoutes } from './routes/webhook.routes.js'
 import { adminRoutes } from './routes/admin.routes.js'
 import { healthRoutes } from './routes/health.routes.js'
@@ -14,6 +15,34 @@ import { APP_NAME, APP_VERSION } from './config/constants.js'
 export async function buildApp() {
   const fastify = Fastify({
     logger: false,
+  })
+
+  // Request logging
+  fastify.addHook('onRequest', (request, _reply, done) => {
+    // Skip health checks to reduce noise
+    if (request.url !== '/health' && request.url !== '/ready') {
+      logger.info({
+        method: request.method,
+        url: request.url,
+        ip: request.headers['x-forwarded-for'] ?? request.ip,
+        userAgent: request.headers['user-agent'],
+      }, 'Incoming request')
+    }
+    done()
+  })
+
+  // Response logging
+  fastify.addHook('onResponse', (request, reply, done) => {
+    // Skip health checks
+    if (request.url !== '/health' && request.url !== '/ready') {
+      logger.info({
+        method: request.method,
+        url: request.url,
+        statusCode: reply.statusCode,
+        responseTime: reply.elapsedTime,
+      }, 'Request completed')
+    }
+    done()
   })
 
   await fastify.register(cors, {
@@ -83,13 +112,29 @@ export async function buildApp() {
     },
   })
 
-  fastify.setErrorHandler((error, _request, reply) => {
+  fastify.setErrorHandler((error, request, reply) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorStack = error instanceof Error ? error.stack : undefined
 
-    logger.error({ error: errorMessage, stack: errorStack }, 'Unhandled error')
+    logger.error({
+      error: errorMessage,
+      stack: errorStack,
+      method: request.method,
+      url: request.url,
+    }, 'Unhandled error')
 
+    // Send to Sentry (skip validation errors)
     const hasValidation = typeof error === 'object' && error !== null && 'validation' in error
+    if (!hasValidation) {
+      Sentry.captureException(error, {
+        extra: {
+          method: request.method,
+          url: request.url,
+          body: request.body,
+        },
+      })
+    }
+
     if (hasValidation && (error as { validation: unknown }).validation) {
       return reply.status(400).send({
         error: 'Validation error',

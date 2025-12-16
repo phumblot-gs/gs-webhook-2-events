@@ -1,3 +1,8 @@
+import { initSentry, Sentry } from './lib/sentry.js'
+
+// Initialize Sentry first
+initSentry()
+
 import { buildApp } from './app.js'
 import { env } from './config/env.js'
 import { logger } from './lib/logger.js'
@@ -32,6 +37,7 @@ async function main() {
     logger.info({ port: env.PORT, host: env.HOST }, 'Server started')
   } catch (error) {
     logger.error({ error }, 'Failed to start server')
+    Sentry.captureException(error)
     await prisma.$disconnect()
     process.exit(1)
   }
@@ -39,5 +45,6 @@ async function main() {
 
 main().catch((error: unknown) => {
   logger.error({ error }, 'Unhandled error in main')
+  Sentry.captureException(error)
   process.exit(1)
 })

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { prisma } from '../lib/prisma.js'
 import { APP_NAME, APP_VERSION } from '../config/constants.js'
 
-export async function healthRoutes(fastify: FastifyInstance) {
+export function healthRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/health',
     {
@@ -33,14 +33,14 @@ export async function healthRoutes(fastify: FastifyInstance) {
       try {
         await prisma.$queryRaw`SELECT 1`
 
-        return reply.send({
+        return await reply.send({
           status: 'healthy',
           name: APP_NAME,
           version: APP_VERSION,
           timestamp: new Date().toISOString(),
         })
-      } catch (error) {
-        return reply.status(503).send({
+      } catch {
+        return await reply.status(503).send({
           status: 'unhealthy',
           error: 'Database connection failed',
         })

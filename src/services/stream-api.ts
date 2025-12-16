@@ -25,7 +25,7 @@ export class StreamApiClient {
 
     const event = {
       eventId,
-      eventType: `gs.${input.accountId}.${input.eventType}`,
+      eventType: `gs.${String(input.accountId)}.${input.eventType}`,
       timestamp,
       source: {
         application: APP_NAME,
@@ -40,7 +40,7 @@ export class StreamApiClient {
       scope: {
         accountId: String(input.accountId),
         resourceType: input.resourceType,
-        resourceId: String(input.resourceId),
+        resourceId: input.resourceId,
       },
       payload: input.payload,
       metadata: null,
@@ -65,7 +65,7 @@ export class StreamApiClient {
         return {
           success: false,
           eventId,
-          error: `HTTP ${response.status}: ${errorText}`,
+          error: `HTTP ${String(response.status)}: ${errorText}`,
         }
       }
 

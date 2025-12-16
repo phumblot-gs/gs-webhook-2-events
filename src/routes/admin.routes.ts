@@ -20,7 +20,7 @@ async function adminAuth(request: FastifyRequest, reply: FastifyReply) {
   }
 }
 
-export async function adminRoutes(fastify: FastifyInstance) {
+export function adminRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', adminAuth)
 
   // List clients

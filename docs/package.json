@@ -8,6 +8,7 @@
     "lint": "redocly lint openapi.yaml"
   },
   "devDependencies": {
-    "@redocly/cli": "^1.25.13"
+    "@redocly/cli": "^1.25.13",
+    "typescript-eslint": "^8.50.0"
   }
 }

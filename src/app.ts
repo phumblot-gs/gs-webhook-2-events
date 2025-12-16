@@ -51,7 +51,7 @@ export async function buildApp() {
           description: 'Staging',
         },
         {
-          url: `http://localhost:${env.PORT}`,
+          url: `http://localhost:${String(env.PORT)}`,
           description: 'Local development',
         },
       ],

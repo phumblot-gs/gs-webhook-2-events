@@ -158,7 +158,7 @@ export class ClientService {
       select: { webhookSecretKey: true, enabled: true },
     })
 
-    if (!client || !client.enabled) {
+    if (!client?.enabled) {
       return false
     }
 

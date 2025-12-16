@@ -7,7 +7,6 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().url(),
 
-  WEBHOOK_SECRET_KEY: z.string().min(16),
   ADMIN_API_KEY: z.string().min(16),
 
   GS_STREAM_API_URL: z.string().url(),

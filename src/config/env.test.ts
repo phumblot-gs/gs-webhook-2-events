@@ -7,7 +7,6 @@ describe('env schema validation', () => {
     PORT: z.coerce.number().default(3000),
     HOST: z.string().default('0.0.0.0'),
     DATABASE_URL: z.string().url(),
-    WEBHOOK_SECRET_KEY: z.string().min(16),
     ADMIN_API_KEY: z.string().min(16),
     GS_STREAM_API_URL: z.string().url(),
     GS_STREAM_API_TOKEN: z.string().min(1),
@@ -19,7 +18,6 @@ describe('env schema validation', () => {
     const env = {
       NODE_ENV: 'development',
       DATABASE_URL: 'postgresql://localhost:5432/test',
-      WEBHOOK_SECRET_KEY: 'test-webhook-secret-key',
       ADMIN_API_KEY: 'test-admin-api-key-123',
       GS_STREAM_API_URL: 'https://test.example.com',
       GS_STREAM_API_TOKEN: 'test-token',
@@ -29,7 +27,6 @@ describe('env schema validation', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.DATABASE_URL).toBe('postgresql://localhost:5432/test')
-      expect(result.data.WEBHOOK_SECRET_KEY).toBe('test-webhook-secret-key')
       expect(result.data.NODE_ENV).toBe('development')
       expect(result.data.PORT).toBe(3000)
     }
@@ -39,7 +36,6 @@ describe('env schema validation', () => {
     const env = {
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://localhost:5432/test',
-      WEBHOOK_SECRET_KEY: 'test-webhook-secret-key',
       ADMIN_API_KEY: 'test-admin-api-key-123',
       GS_STREAM_API_URL: 'https://test.example.com',
       GS_STREAM_API_TOKEN: 'test-token',
@@ -58,7 +54,6 @@ describe('env schema validation', () => {
   it('should reject invalid DATABASE_URL', () => {
     const env = {
       DATABASE_URL: 'not-a-url',
-      WEBHOOK_SECRET_KEY: 'test-webhook-secret-key',
       ADMIN_API_KEY: 'test-admin-api-key-123',
       GS_STREAM_API_URL: 'https://test.example.com',
       GS_STREAM_API_TOKEN: 'test-token',
@@ -68,11 +63,10 @@ describe('env schema validation', () => {
     expect(result.success).toBe(false)
   })
 
-  it('should reject short WEBHOOK_SECRET_KEY', () => {
+  it('should reject short ADMIN_API_KEY', () => {
     const env = {
       DATABASE_URL: 'postgresql://localhost:5432/test',
-      WEBHOOK_SECRET_KEY: 'short',
-      ADMIN_API_KEY: 'test-admin-api-key-123',
+      ADMIN_API_KEY: 'short',
       GS_STREAM_API_URL: 'https://test.example.com',
       GS_STREAM_API_TOKEN: 'test-token',
     }

@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js'
+import { generateSecretKey } from '../lib/crypto.js'
 import { EVENT_TYPES } from '../config/constants.js'
 import type { CreateClientInput, UpdateClientInput, UpdateWebhookConfigsInput } from '../schemas/admin.js'
 
@@ -48,10 +49,13 @@ export class ClientService {
   }
 
   async create(input: CreateClientInput) {
+    const webhookSecretKey = generateSecretKey()
+
     return prisma.client.create({
       data: {
         accountId: input.accountId,
         accountName: input.accountName,
+        webhookSecretKey,
         enabled: input.enabled,
         webhookConfigs: {
           create: EVENT_TYPES.map((eventType) => ({
@@ -60,6 +64,18 @@ export class ClientService {
           })),
         },
       },
+      include: {
+        webhookConfigs: true,
+      },
+    })
+  }
+
+  async regenerateWebhookKey(id: string) {
+    const webhookSecretKey = generateSecretKey()
+
+    return prisma.client.update({
+      where: { id },
+      data: { webhookSecretKey },
       include: {
         webhookConfigs: true,
       },
@@ -134,6 +150,19 @@ export class ClientService {
 
     const config = client.webhookConfigs[0]
     return config?.enabled ?? false
+  }
+
+  async validateWebhookKey(accountId: number, key: string): Promise<boolean> {
+    const client = await prisma.client.findUnique({
+      where: { accountId },
+      select: { webhookSecretKey: true, enabled: true },
+    })
+
+    if (!client || !client.enabled) {
+      return false
+    }
+
+    return client.webhookSecretKey === key
   }
 }
 

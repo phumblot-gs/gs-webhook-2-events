@@ -11,7 +11,9 @@ info:
     ## Authentication
 
     ### Webhook Endpoint
-    The webhook endpoint requires a secret key passed as a query parameter (`key`).
+    The webhook endpoint requires a per-client secret key passed as a query parameter (`key`).
+    Each client has its own unique `webhookSecretKey` that is automatically generated when the client is created.
+    The key can be regenerated at any time via the admin API.
 
     ### Admin API
     The admin API requires an API key passed in the `x-api-key` header.
@@ -73,6 +75,9 @@ components:
         accountName:
           type: string
           description: Client name
+        webhookSecretKey:
+          type: string
+          description: Secret key for webhook authentication (unique per client)
         enabled:
           type: boolean
           description: Whether the client is enabled
@@ -281,7 +286,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Secret key for authentication
+          description: Per-client secret key for authentication (obtain from admin API)
       requestBody:
         required: true
         content:
@@ -535,6 +540,50 @@ paths:
       responses:
         '204':
           description: Client deleted
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/clients/{id}/regenerate-key:
+    post:
+      tags:
+        - Admin - Clients
+      summary: Regenerate webhook secret key
+      description: |
+        Generate a new webhook secret key for a client.
+
+        The previous key will be invalidated immediately. Make sure to update the webhook URL
+        in Grand Shooting with the new key after regeneration.
+      operationId: regenerateWebhookKey
+      security:
+        - apiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: New key generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhookSecretKey:
+                    type: string
+                    description: The new webhook secret key
         '401':
           description: Invalid or missing API key
           content:

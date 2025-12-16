@@ -6,7 +6,6 @@ vi.mock('../config/env.js', () => ({
     PORT: 3000,
     HOST: '0.0.0.0',
     DATABASE_URL: 'postgresql://localhost:5432/test',
-    WEBHOOK_SECRET_KEY: 'test-secret-key-12345',
     ADMIN_API_KEY: 'test-admin-key-12345',
     GS_STREAM_API_URL: 'https://test.example.com',
     GS_STREAM_API_TOKEN: 'test-token',
@@ -43,6 +42,14 @@ vi.mock('../services/webhook.service.js', () => ({
   },
 }))
 
+vi.mock('../services/client.service.js', () => ({
+  clientService: {
+    validateWebhookKey: vi.fn().mockImplementation((accountId: number, key: string) => {
+      return Promise.resolve(accountId === 12345 && key === 'valid-client-key-12345')
+    }),
+  },
+}))
+
 import type { FastifyInstance } from 'fastify'
 
 describe('webhook routes', () => {
@@ -61,7 +68,7 @@ describe('webhook routes', () => {
   it('should accept valid webhook request', async () => {
     const response = await app.inject({
       method: 'POST',
-      url: '/webhook/12345?key=test-secret-key-12345',
+      url: '/webhook/12345?key=valid-client-key-12345',
       payload: {
         account_id: 12345,
         topic: 'pictures/create',
@@ -113,7 +120,7 @@ describe('webhook routes', () => {
   it('should reject invalid payload', async () => {
     const response = await app.inject({
       method: 'POST',
-      url: '/webhook/12345?key=test-secret-key-12345',
+      url: '/webhook/12345?key=valid-client-key-12345',
       payload: {
         account_id: 12345,
         topic: 'pictures/create',
@@ -127,7 +134,7 @@ describe('webhook routes', () => {
   it('should reject invalid account ID', async () => {
     const response = await app.inject({
       method: 'POST',
-      url: '/webhook/invalid?key=test-secret-key-12345',
+      url: '/webhook/invalid?key=valid-client-key-12345',
       payload: {
         account_id: 12345,
         topic: 'pictures/create',

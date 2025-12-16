@@ -6,7 +6,6 @@ vi.mock('../config/env.js', () => ({
     PORT: 3000,
     HOST: '0.0.0.0',
     DATABASE_URL: 'postgresql://localhost:5432/test',
-    WEBHOOK_SECRET_KEY: 'test-secret-key-12345',
     ADMIN_API_KEY: 'test-admin-key-12345',
     GS_STREAM_API_URL: 'https://test.example.com',
     GS_STREAM_API_TOKEN: 'test-token',

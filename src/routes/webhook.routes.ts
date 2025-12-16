@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import { env } from '../config/env.js'
 import { logger } from '../lib/logger.js'
 import { webhookService } from '../services/webhook.service.js'
+import { clientService } from '../services/client.service.js'
 import { webhookPayloadSchema, webhookQuerySchema, webhookParamsSchema } from '../schemas/webhook.js'
 
 export async function webhookRoutes(fastify: FastifyInstance) {
@@ -70,14 +70,17 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Missing or invalid key parameter' })
       }
 
-      if (queryResult.data.key !== env.WEBHOOK_SECRET_KEY) {
-        logger.warn({ accountId: request.params.accountId }, 'Invalid webhook secret key')
-        return reply.status(401).send({ error: 'Invalid secret key' })
-      }
-
       const paramsResult = webhookParamsSchema.safeParse(request.params)
       if (!paramsResult.success) {
         return reply.status(400).send({ error: 'Invalid account ID' })
+      }
+
+      const { accountId } = paramsResult.data
+
+      const isValidKey = await clientService.validateWebhookKey(accountId, queryResult.data.key)
+      if (!isValidKey) {
+        logger.warn({ accountId }, 'Invalid webhook secret key or client not found/disabled')
+        return reply.status(401).send({ error: 'Invalid secret key or client not found' })
       }
 
       const payloadResult = webhookPayloadSchema.safeParse(request.body)
@@ -86,7 +89,6 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Invalid payload' })
       }
 
-      const { accountId } = paramsResult.data
       const payload = payloadResult.data
 
       if (payload.account_id !== accountId) {

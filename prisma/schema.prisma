@@ -8,12 +8,13 @@ datasource db {
 }
 
 model Client {
-  id          String   @id @default(uuid())
-  accountId   Int      @unique @map("account_id")
-  accountName String   @map("account_name")
-  enabled     Boolean  @default(true)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  accountId        Int      @unique @map("account_id")
+  accountName      String   @map("account_name")
+  webhookSecretKey String   @map("webhook_secret_key")
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   webhookConfigs WebhookConfig[]
   failedEvents   FailedEvent[]

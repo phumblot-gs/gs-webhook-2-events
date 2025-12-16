@@ -50,6 +50,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
                     id: { type: 'string' },
                     accountId: { type: 'integer' },
                     accountName: { type: 'string' },
+                    webhookSecretKey: { type: 'string' },
                     enabled: { type: 'boolean' },
                     createdAt: { type: 'string' },
                     updatedAt: { type: 'string' },
@@ -110,6 +111,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
               id: { type: 'string' },
               accountId: { type: 'integer' },
               accountName: { type: 'string' },
+              webhookSecretKey: { type: 'string' },
               enabled: { type: 'boolean' },
               createdAt: { type: 'string' },
               updatedAt: { type: 'string' },
@@ -161,6 +163,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
               id: { type: 'string' },
               accountId: { type: 'integer' },
               accountName: { type: 'string' },
+              webhookSecretKey: { type: 'string' },
               enabled: { type: 'boolean' },
               createdAt: { type: 'string' },
               updatedAt: { type: 'string' },
@@ -224,6 +227,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
               id: { type: 'string' },
               accountId: { type: 'integer' },
               accountName: { type: 'string' },
+              webhookSecretKey: { type: 'string' },
               enabled: { type: 'boolean' },
               createdAt: { type: 'string' },
               updatedAt: { type: 'string' },
@@ -249,6 +253,57 @@ export async function adminRoutes(fastify: FastifyInstance) {
       }
 
       const client = await clientService.update(params.id, input)
+      return reply.send(client)
+    }
+  )
+
+  // Regenerate webhook key
+  fastify.post(
+    '/admin/clients/:id/regenerate-key',
+    {
+      schema: {
+        description: 'Regenerate the webhook secret key for a client',
+        tags: ['Admin - Clients'],
+        security: [{ apiKey: [] }],
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+          },
+          required: ['id'],
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              accountId: { type: 'integer' },
+              accountName: { type: 'string' },
+              webhookSecretKey: { type: 'string' },
+              enabled: { type: 'boolean' },
+              createdAt: { type: 'string' },
+              updatedAt: { type: 'string' },
+              webhookConfigs: { type: 'array' },
+            },
+          },
+          404: {
+            type: 'object',
+            properties: {
+              error: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const params = clientIdParamSchema.parse(request.params)
+
+      const existing = await clientService.findById(params.id)
+      if (!existing) {
+        return reply.status(404).send({ error: 'Client not found' })
+      }
+
+      const client = await clientService.regenerateWebhookKey(params.id)
       return reply.send(client)
     }
   )

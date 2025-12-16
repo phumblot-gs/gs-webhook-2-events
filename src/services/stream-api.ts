@@ -23,9 +23,12 @@ export class StreamApiClient {
     const eventId = uuidv4()
     const timestamp = new Date().toISOString()
 
+    // Format accountId as UUID-like string for gs-stream-api compatibility
+    const accountIdUuid = `00000000-0000-0000-0000-${String(input.accountId).padStart(12, '0')}`
+
     const event = {
       eventId,
-      eventType: `gs.${String(input.accountId)}.${input.eventType}`,
+      eventType: input.eventType,
       timestamp,
       source: {
         application: APP_NAME,
@@ -34,16 +37,16 @@ export class StreamApiClient {
       },
       actor: {
         userId: '00000000-0000-0000-0000-000000000000',
-        accountId: String(input.accountId),
-        role: null,
+        accountId: accountIdUuid,
+        role: 'system',
       },
       scope: {
-        accountId: String(input.accountId),
+        accountId: accountIdUuid,
         resourceType: input.resourceType,
         resourceId: input.resourceId,
       },
       payload: input.payload,
-      metadata: null,
+      metadata: {},
     }
 
     try {
